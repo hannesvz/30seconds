@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>30 Seconds — card mockup</title>
+<style>
+  body { font-family: system-ui, sans-serif; display: flex; flex-direction: column;
+         align-items: center; gap: 16px; padding: 24px; background: #f0f0f0; }
+  canvas { width: 564px; max-width: 95vw; height: auto; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .controls { display: flex; gap: 12px; align-items: center; }
+  button { font-size: 16px; padding: 8px 20px; cursor: pointer; }
+  .group { display: flex; border: 1px solid #888; border-radius: 6px; overflow: hidden; }
+  .group button { border: 0; background: #fff; }
+  .group button.active { background: #1b6; color: #fff; }
+</style>
+
+<div class="group">
+  <button id="young" class="active">young</button>
+  <button id="old">old</button>
+</div>
+<canvas id="card" width="376" height="250"></canvas>
+<div class="controls"><button id="next">Next &rarr;</button></div>
+
+<script>
+const cv = document.getElementById('card'), ctx = cv.getContext('2d');
+const imgs = { blue: new Image(), yellow: new Image() };
+imgs.blue.src = 'card_blue.png';
+imgs.yellow.src = 'card_yellow.png';
+
+let pool = { young: [], old: [] };
+let group = 'young';
+
+// 5 text lines: left edge of central panel, evenly spaced. Tuned to the 376x250 template.
+const X = 72, Y0 = 62, DY = 38, MAXW = 240;
+
+function pick5(list) {
+  const out = [], used = new Set();
+  while (out.length < 5 && used.size < list.length) {
+    const i = (Math.random() * list.length) | 0;
+    if (used.has(i)) continue;
+    used.add(i); out.push(list[i]);
+  }
+  return out;
+}
+
+function draw() {
+  const colour = Math.random() < 0.5 ? 'blue' : 'yellow';
+  const words = pick5(pool[group]);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(imgs[colour], 0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'middle';
+  words.forEach((w, i) => {
+    let size = 17;
+    const text = w.toUpperCase();
+    do { ctx.font = `bold ${size}px Arial, sans-serif`; size--; }
+    while (ctx.measureText(text).width > MAXW && size > 8);
+    ctx.fillText(text, X, Y0 + i * DY);
+  });
+}
+
+function setGroup(g) {
+  group = g;
+  document.getElementById('young').classList.toggle('active', g === 'young');
+  document.getElementById('old').classList.toggle('active', g === 'old');
+  draw();
+}
+
+document.getElementById('next').onclick = draw;
+document.getElementById('young').onclick = () => setGroup('young');
+document.getElementById('old').onclick = () => setGroup('old');
+
+fetch('wordlist.json').then(r => r.json()).then(data => {
+  for (const g of ['young', 'old'])
+    pool[g] = Object.values(data[g]).flat();
+  let ready = 0;
+  const go = () => (++ready === 2) && draw();
+  imgs.blue.onload = go; imgs.yellow.onload = go;
+  if (imgs.blue.complete) go();
+  if (imgs.yellow.complete) go();
+}).catch(e => {
+  ctx.fillText('Load failed — serve this dir over HTTP (see note).', 10, 20);
+  console.error(e);
+});
+</script>
